@@ -4,5 +4,8 @@
         build:
           context: .
           dockerfile: Dockerfile
+        volumes:
+          - ./we-movie-db/data:/var/lib/postgresql/data  # Persistent data volume
+          - ./we-movie-db/init.sql:/docker-entrypoint-initdb.d/init.sql  # Initialization script volume
         ports:
           - "5432:5432"

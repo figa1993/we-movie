@@ -42,20 +42,27 @@
 
 import React, { useState, useEffect } from 'react';
 
-function App() {
-    const [usernames, setUsernames] = useState(null);
+const Users = () => {
 
-    useEffect(() => {
-        fetch('http://localhost:8080/users')
-            .then(response => response.text())
-            .then(data => setUsernames(data));
-    }, []);
+  const [users, setUsers] = useState([]);
+  const [jsonResponse, setJsonResponse] = useState('');
 
-    return (
-        <div>
-            {usernames ? usernames : 'No usernames available'}
-        </div>
-    );
-}
+  useEffect(() => {
+    fetch('http://localhost:8080/users')
+      .then(response => response.json())
+      .then(data => {
+        setUsers(data);
+        setJsonResponse(JSON.stringify(data, null, 2));
+      });
+  }, []);
 
-export default App;
+  return (
+    <ul>
+      {users.map((user, index) => (
+        <li key={index}>{user}</li>
+      ))}
+    </ul>
+  );
+};
+
+export default Users;
