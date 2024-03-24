@@ -7,10 +7,10 @@ echo "Waiting for PostgreSQL to initialize..."
 sleep 20
 
 # Start the Rust backend
-cd we-movie-backend
-cargo run
+cd we-movie-backend 
+cargo run & 
 
 
 # Start the React frontend
-cd ../we-movie-frontend
-npm start
+cd ../we-movie-frontend 
+npm start &

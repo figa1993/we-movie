@@ -1,68 +1,26 @@
-// import React, { useEffect, useState } from 'react';
-// import axios from 'axios';
+// src/components/GoogleOAuthLoginPage.js
+import React from 'react';
 
-// function App() {
-//     const [message, setMessage] = useState("");
-//     const [inputValue, setInputValue] = useState('');
+const GoogleOAuthLoginPage = () => {
+ const clientId = process.env.REACT_APP_GOOGLE_OAUTH_CLIENT_ID;
+ const redirectUri = encodeURIComponent('http://localhost:8080/oauth_callback');
+ const scope = encodeURIComponent('email profile');
+ const responseType = 'code';
+ const state = process.env.REACT_APP_GOOGLE_OAUTH_CLIENT_SECRET;
 
-//     // An event handler for when the submit button is pressed
-//     const handleSubmit = async (event) => {
-//       event.preventDefault();
-//       try {
-//         const response = await axios.post('http://localhost:8080/create-user', { data: inputValue });
-//         console.log(response.data);
-//         // handle response here
-//       } catch (error) {
-//         console.error(error);
-//         // handle error here
-//       }
-//     };
+ const handleLogin = () => {
+   console.log("Google Client ID:" + clientId);
+   console.log(state);
+   const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${redirectUri}&scope=${scope}&response_type=${responseType}&state=${state}`;
+    window.location.href = url;
+ };
 
-//     useEffect(() => {
-//         axios.get('http://localhost:8080')
-//             .then(response => {
-//                 setMessage(response.data);
-//             });
-//     }, []);
-
-//     return (
-//       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-//         <h1>We Movie Sign Up</h1>
-//         <label>Select Username</label>
-//         <input
-//           type="text"
-//           value={inputValue}
-//           onChange={e => setInputValue(e.target.value)}
-//           style={{ margin:'10px 0'}}
-//         />
-//         <button type="submit">Submit</button>
-//       </form>
-//     );
-// }
-
-import React, { useState, useEffect } from 'react';
-
-const Users = () => {
-
-  const [users, setUsers] = useState([]);
-  const [jsonResponse, setJsonResponse] = useState('');
-
-  useEffect(() => {
-    fetch('http://localhost:8080/users')
-      .then(response => response.json())
-      .then(data => {
-        setUsers(data);
-        setJsonResponse(JSON.stringify(data, null, 2));
-      });
-  }, []);
-
-  return (
-    <ul>
-      {users.map((user, index) => (
-        <li key={index}>{user}</li>
-      ))}
-    </ul>
-  );
+ return (
+    <div>
+      <h2>Login with Google</h2>
+      <button onClick={handleLogin}>Login</button>
+    </div>
+ );
 };
 
-export default Users;
+export default GoogleOAuthLoginPage;
