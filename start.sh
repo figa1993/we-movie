@@ -1,4 +1,8 @@
 #!/bin/sh
+# start the redis server
+echo "starting redis server"
+sudo redis-server /etc/redis/redis.conf
+
 # Start the Docker container
 docker-compose up -d
 
