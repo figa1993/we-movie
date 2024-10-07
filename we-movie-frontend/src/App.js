@@ -4,7 +4,7 @@ import React from 'react';
 const GoogleOAuthLoginPage = () => {
  const clientId = process.env.REACT_APP_GOOGLE_OAUTH_CLIENT_ID;
  const redirectUri = encodeURIComponent('http://localhost:8080/oauth_callback');
- const scope = encodeURIComponent('email profile');
+ const scope = encodeURIComponent('openid');
  const responseType = 'code';
  const state = process.env.REACT_APP_GOOGLE_OAUTH_CLIENT_SECRET;
 

@@ -1,10 +1,12 @@
 // Import the necessary modules from the actix_cors and actix_web crates
 use actix_cors::Cors;
-use actix_web::{get, web, App, HttpServer, Responder, HttpResponse};
+use actix_web::{get, web, App, HttpServer, Responder, HttpResponse, cookie::CookieBuilder, HttpRequest};
 
 // Import actix_session which provides capability to use Redis for Session Management
 use actix_session::{Session, SessionMiddleware, storage::RedisSessionStore};
 use actix_web::cookie::Key;
+
+// Import awc (actix web client) which provides capability to make HTTP client requests
 
 use oauth2::reqwest::async_http_client;
 use serde::Deserialize;
@@ -61,7 +63,7 @@ pub struct AuthRequest {
 
 fn build_oauth_client(client_id: String, client_secret: String) -> BasicClient {
     // In prod, http://localhost:8000 will get replaced by whatever the production URL is
-    let redirect_url = "http://localhost:8000/oauth_callback".to_string();
+    let redirect_url = "http://localhost:8080/oauth_callback".to_string();
         
     let auth_url = AuthUrl::new("https://accounts.google.com/o/oauth2/v2/auth".to_string())
         .expect("Invalid authorization endpoint URL");
@@ -90,34 +92,74 @@ async fn ouath_callback(query: web::Query<HashMap<String, String>>, client: web:
         .await;
 
         match token_result {
-            Ok(token) => {
-                // Store the access token in the session
-                session.insert("access_token", token.access_token().secret()).unwrap();
-                HttpResponse::Ok().body("Logged in successfully")
-
-                // @TODO: Use the Access Token to get unique identifying information that can be used as a key for finding user data
+            Ok(access_token_response) => {
+                // @TODO: Use the Access Token to get an ID token with data that can be used as a key for finding user data
                 // https://developers.google.com/identity/sign-in/web/backend-auth
+                let tokeninfo_url = format!(
+                    "https://www.googleapis.com/oauth2/v3/tokeninfo?access_token={}",
+                    access_token_response.access_token().secret()
+                );
+
+                let http_client = awc::Client::default();
+
+                let id_token_request = http_client.get(&tokeninfo_url).send().await;
+                match id_token_request {
+                    Ok(mut id_token_response) => {
+                        let id_token_result = id_token_response.json::<String>().await;
+                        match id_token_result {
+                            Ok(id_token) => {
+
+                                // ID Token validation is optional so we skip it.
+
+                                let cookie = CookieBuilder::new("id_token", id_token.clone())
+                                .http_only(true)
+                                .finish();
+                                session.insert("id_token",id_token);
+                                HttpResponse::Found()
+                                .cookie(cookie)
+                                .header("Location", "http://localhost:3000/JWTCallback")
+                                .finish()
+                            }
+                            Err (e) => {
+                                HttpResponse::InternalServerError().body( format!("Malformed ID Token JSON payload received with error:{:?}",e))
+                            }                        
+                        }
+                    }
+                    Err(e) => {
+                        HttpResponse::InternalServerError().body( format!("Retrieving ID Token failed with error:{:?}",e))
+                    }
+                }
             },
-            Err(_) => HttpResponse::InternalServerError().body("Error exchanging code for token"),
+            Err(e) => HttpResponse::InternalServerError().body( format!("Exchanging code for access token failed with error:{:?}",e)),
         }
 }
 
-#[get("/protected")]
-async fn protected_route(session: Session) -> impl Responder {
-    match session.get::<String>("access_token") {
-        Ok(token) => HttpResponse::Ok().body(format!("Access token is valid")),
-        Error => HttpResponse::Unauthorized().body("Unauthorized"),
+#[get("/UserHomePage")]
+async fn protected(req: HttpRequest) -> impl Responder {
+    if let Some(cookie) = req.cookie("id_token") {
+        let id_token = cookie.value();
+        // Optionally, validate the ID Token
+        // let client_secret = env::var("OAUTH_CLIENT_SECRET").expect("OAUTH_CLIENT_SECRET not set");
+        // let id_token_claims: Claims = decode(
+        //     id_token,
+        //     &DecodingKey::from_secret(client_secret.as_ref()),
+        //     &Validation::new(Algorithm::RS256)
+        // ).expect("Invalid ID token").claims;
+
+        HttpResponse::Ok().body(format!("Your ID token is {}", id_token))
+    } else {
+        HttpResponse::Unauthorized().body("No token provided")
     }
 }
 
 pub async fn run() -> std::io::Result<()> {
     dotenv().ok();
 
-    // Initialize the database
+    println!("Initializing Database connection");
     let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
     let db_pool = PgPool::connect(&database_url).await.expect("Failed to create pool");
 
-    // Initialize Redis session store
+    println!("Initializing Redis session store");
     let redis_store = RedisSessionStore::new("redis://127.0.0.1:6379".to_string())
         .await
         .expect("Failed to create Redis session store");
@@ -130,6 +172,7 @@ pub async fn run() -> std::io::Result<()> {
     let google_oauth_client_secret = env::var("REACT_APP_GOOGLE_OAUTH_CLIENT_SECRET").expect("REACT_APP_GOOGLE_OAUTH_CLIENT_SECRET must be set");
     let oauth_client = build_oauth_client(google_oauth_client_id,google_oauth_client_secret);
 
+    println!("Starting Http Server");
     HttpServer::new(move || {
             // Create a new CORS middleware
             // The permissive method allows any origin, any headers, and any methods
